@@ -3,138 +3,349 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>BlobTracker</title>
+<title>Eigenflow</title>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  background: #0f0f11;
-  color: #f0f0f2;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-header {
-  padding: 12px 16px 10px;
-  border-bottom: 1px solid #2a2a30;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-header h1 { font-size: 20px; font-weight: 700; }
-header h1 span { color: #4f8ef7; }
-.badge {
-  background: #1a2d55; color: #4f8ef7;
-  font-size: 10px; font-weight: 700;
-  padding: 2px 7px; border-radius: 4px;
-}
-#fps-label { color: #80808a; font-size: 12px; margin-left: auto; }
+*{box-sizing:border-box;margin:0;padding:0}
 
-.app { display: flex; flex-direction: column; height: calc(100vh - 47px); }
+body{
+  background:#060810;
+  color:#e8eaf0;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+  min-height:100vh;
+  overflow:hidden;
+}
 
-.video-wrap {
-  position: relative; background: #000;
-  flex: 1; min-height: 0;
+/* Ambient background orbs */
+body::before,body::after{
+  content:'';position:fixed;border-radius:50%;
+  filter:blur(80px);pointer-events:none;z-index:0;
 }
-video, canvas#overlay {
-  position: absolute; top: 0; left: 0;
-  width: 100%; height: 100%;
-  object-fit: contain; display: block;
+body::before{
+  width:500px;height:500px;
+  background:radial-gradient(circle,rgba(0,212,255,0.12),transparent 70%);
+  top:-100px;left:-100px;
 }
-video { position: relative; }
-canvas#overlay { pointer-events: none; }
+body::after{
+  width:400px;height:400px;
+  background:radial-gradient(circle,rgba(120,80,255,0.10),transparent 70%);
+  bottom:-80px;right:-80px;
+}
 
-.blob-badge {
-  position: absolute; top: 10px; left: 12px;
-  background: rgba(0,0,0,0.6);
-  border: 1px solid #2a2a30; border-radius: 8px;
-  padding: 5px 10px; font-size: 13px;
-  font-weight: 600; color: #00ff88;
+/* Glass mixin */
+.glass{
+  background:rgba(255,255,255,0.04);
+  backdrop-filter:blur(20px) saturate(1.4);
+  -webkit-backdrop-filter:blur(20px) saturate(1.4);
+  border:1px solid rgba(255,255,255,0.10);
 }
-.rec-badge {
-  position: absolute; top: 10px; right: 12px;
-  background: rgba(255,69,58,0.85); border-radius: 8px;
-  padding: 5px 10px; font-size: 12px; font-weight: 700;
-  color: #fff; display: none; align-items: center; gap: 6px;
+.glass-strong{
+  background:rgba(255,255,255,0.07);
+  backdrop-filter:blur(32px) saturate(1.6);
+  -webkit-backdrop-filter:blur(32px) saturate(1.6);
+  border:1px solid rgba(255,255,255,0.13);
 }
-.rec-badge.active { display: flex; }
-.rec-dot {
-  width: 8px; height: 8px; background: #fff;
-  border-radius: 50%; animation: blink 1s infinite;
-}
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
-.controls {
-  background: #131316; border-top: 1px solid #2a2a30;
-  padding: 10px 12px; display: flex;
-  flex-direction: column; gap: 10px;
-  overflow-y: auto; max-height: 54vh;
+/* Header */
+header{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:10px 16px;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(6,8,16,0.6);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  border-bottom:1px solid rgba(255,255,255,0.07);
 }
-.btn-row { display: flex; gap: 7px; flex-wrap: wrap; }
-button {
-  flex: 1; padding: 9px 6px;
-  border: none; border-radius: 10px;
-  font-size: 12px; font-weight: 600;
-  cursor: pointer; transition: opacity 0.15s;
-  font-family: inherit; min-width: 60px;
+.logo{
+  font-size:18px;font-weight:700;letter-spacing:-0.5px;
+  background:linear-gradient(135deg,#00d4ff,#7850ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
 }
-button:active { opacity: 0.75; }
-
-.btn-src     { background:#1a2d55; color:#4f8ef7; border:1px solid #4f8ef7; }
-.btn-src.off { background:#1e1e24; color:#c0c0cc; border:1px solid #35353f; }
-.btn-cam-f   { background:#1e1e24; color:#c0c0cc; border:1px solid #35353f; }
-.btn-cam-f.active { background:#1a2d55; color:#4f8ef7; border-color:#4f8ef7; }
-.btn-cam-b   { background:#1e1e24; color:#c0c0cc; border:1px solid #35353f; }
-.btn-cam-b.active { background:#1a2d55; color:#4f8ef7; border-color:#4f8ef7; }
-.btn-record  { background:#0d2e14; color:#2dce6e; border:1px solid #2dce6e; }
-.btn-record.recording { background:#3d1210; color:#ff453a; border-color:#ff453a; }
-.btn-download { background:#1e1e24; color:#80808a; border:1px solid #35353f; }
-.btn-download.ready { background:#0d2040; color:#4f8ef7; border-color:#4f8ef7; }
-
-.section-title {
-  font-size: 10px; font-weight: 700;
-  letter-spacing: 1.4px; color: #80808a;
-  text-transform: uppercase; margin-bottom: 2px;
+.logo-sub{font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:2px;text-transform:uppercase;}
+.badge{
+  background:rgba(0,212,255,0.12);
+  border:1px solid rgba(0,212,255,0.25);
+  color:#00d4ff;font-size:9px;font-weight:700;
+  padding:2px 7px;border-radius:20px;letter-spacing:0.5px;
 }
-.slider-row { display: flex; flex-direction: column; gap: 6px; }
-.slider-item { display: flex; align-items: center; gap: 8px; }
-.slider-label { font-size: 11px; color: #c0c0cc; width: 120px; flex-shrink: 0; }
-input[type=range] { flex:1; height:4px; accent-color:#4f8ef7; cursor:pointer; }
-.slider-val { font-size:11px; font-weight:700; color:#4f8ef7; width:36px; text-align:right; flex-shrink:0; }
+#fps-label{color:rgba(255,255,255,0.3);font-size:11px;margin-left:auto;font-variant-numeric:tabular-nums;}
 
-.toggle-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-.tog {
-  background: #1e1e24; border: 1px solid #35353f;
-  border-radius: 8px; padding: 7px 8px;
-  font-size: 11px; color: #80808a;
-  text-align: left; cursor: pointer;
-  transition: all 0.15s; flex: unset;
+/* App layout */
+.app{
+  position:fixed;top:47px;left:0;right:0;bottom:0;
+  display:flex;flex-direction:column;z-index:1;
 }
-.tog.on { border-color: currentColor; }
-.tog.on.hull   { color:#ff8844; background:#1a0a00; }
-.tog.on.voro   { color:#bb88ff; background:#150a22; }
-.tog.on.force  { color:#00cfff; background:#001a22; }
-.tog.on.lissa  { color:#00ff88; background:#001a0d; }
-.tog.on.dela   { color:#ffaa00; background:#1a1100; }
-.tog.on.fourier{ color:#ff88cc; background:#1a0011; }
-.tog.on.rdiff  { color:#88ffcc; background:#001a11; }
 
-.upload-area {
-  border: 1.5px dashed #35353f; border-radius: 10px;
-  padding: 12px; text-align: center;
-  color: #80808a; font-size: 12px; cursor: pointer;
-  transition: border-color 0.2s;
+/* Video area */
+.video-wrap{
+  position:relative;flex:1;min-height:0;background:#000;overflow:hidden;
 }
-.upload-area:hover { border-color: #4f8ef7; color: #4f8ef7; }
-.upload-area.has-file { border-color: #2dce6e; color: #2dce6e; }
+video{
+  position:absolute;top:0;left:0;
+  width:100%;height:100%;object-fit:contain;
+}
+canvas#overlay{
+  position:absolute;top:0;left:0;
+  width:100%;height:100%;pointer-events:none;
+}
 
-input[type=file] { display: none; }
+/* HUD badges */
+.hud{
+  position:absolute;top:10px;left:10px;
+  display:flex;flex-direction:column;gap:6px;
+}
+.blob-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 11px;border-radius:20px;
+  font-size:12px;font-weight:600;color:#00ff88;
+  background:rgba(0,255,136,0.08);
+  border:1px solid rgba(0,255,136,0.2);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.blob-dot{width:6px;height:6px;background:#00ff88;border-radius:50%;}
+
+.rec-badge{
+  display:none;align-items:center;gap:6px;
+  padding:5px 11px;border-radius:20px;
+  font-size:12px;font-weight:600;color:#ff453a;
+  background:rgba(255,69,58,0.10);
+  border:1px solid rgba(255,69,58,0.25);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.rec-badge.active{display:flex;}
+.rec-dot{width:6px;height:6px;background:#ff453a;border-radius:50%;animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* Controls panel */
+.controls{
+  position:relative;z-index:10;
+  background:rgba(6,8,16,0.75);
+  backdrop-filter:blur(32px) saturate(1.5);
+  -webkit-backdrop-filter:blur(32px) saturate(1.5);
+  border-top:1px solid rgba(255,255,255,0.07);
+  padding:12px 14px 14px;
+  display:flex;flex-direction:column;gap:11px;
+  overflow-y:auto;max-height:56vh;
+}
+
+/* Section label */
+.sec{
+  font-size:9px;font-weight:700;letter-spacing:2px;
+  color:rgba(255,255,255,0.25);text-transform:uppercase;
+  margin-bottom:1px;
+}
+
+/* Pill button row */
+.pill-row{display:flex;gap:7px;flex-wrap:wrap;}
+
+.pill{
+  flex:1;min-width:70px;
+  padding:8px 10px;border:none;border-radius:20px;
+  font-size:11px;font-weight:600;cursor:pointer;
+  font-family:inherit;letter-spacing:0.3px;
+  transition:all 0.2s;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.09);
+  color:rgba(255,255,255,0.45);
+}
+.pill:active{transform:scale(0.96);}
+.pill.active{
+  background:rgba(0,212,255,0.12);
+  border-color:rgba(0,212,255,0.35);
+  color:#00d4ff;
+}
+.pill.rec-on{
+  background:rgba(255,69,58,0.12);
+  border-color:rgba(255,69,58,0.35);
+  color:#ff453a;
+}
+.pill.save-ready{
+  background:rgba(0,212,255,0.10);
+  border-color:rgba(0,212,255,0.3);
+  color:#00d4ff;
+}
+
+/* Upload zone */
+.upload-zone{
+  border:1.5px dashed rgba(255,255,255,0.12);
+  border-radius:14px;padding:11px 14px;
+  text-align:center;cursor:pointer;
+  color:rgba(255,255,255,0.3);font-size:12px;
+  transition:all 0.2s;
+  background:rgba(255,255,255,0.02);
+}
+.upload-zone:hover{
+  border-color:rgba(0,212,255,0.4);
+  color:#00d4ff;background:rgba(0,212,255,0.04);
+}
+.upload-zone.loaded{
+  border-color:rgba(0,255,136,0.3);
+  color:#00ff88;background:rgba(0,255,136,0.04);
+}
+input[type=file]{display:none;}
+
+/* Sliders */
+.slider-grid{display:flex;flex-direction:column;gap:8px;}
+.slider-row{display:flex;align-items:center;gap:10px;}
+.slider-lbl{font-size:11px;color:rgba(255,255,255,0.4);width:115px;flex-shrink:0;}
+input[type=range]{
+  flex:1;height:3px;cursor:pointer;
+  accent-color:#00d4ff;
+  background:rgba(255,255,255,0.1);border-radius:2px;
+}
+.slider-val{
+  font-size:11px;font-weight:700;color:#00d4ff;
+  width:38px;text-align:right;flex-shrink:0;
+  font-variant-numeric:tabular-nums;
+}
+
+/* Overlay cards grid */
+.overlay-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:7px;
+}
+.ov-card{
+  border-radius:14px;padding:10px 12px;
+  cursor:pointer;transition:all 0.2s;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);
+  text-align:left;font-family:inherit;
+  display:flex;flex-direction:column;gap:3px;
+}
+.ov-card:active{transform:scale(0.97);}
+.ov-card.on{
+  background:rgba(0,212,255,0.07);
+  border-color:rgba(0,212,255,0.25);
+}
+.ov-card.on.hull-c  {background:rgba(255,136,68,0.07); border-color:rgba(255,136,68,0.25);}
+.ov-card.on.voro-c  {background:rgba(187,136,255,0.07);border-color:rgba(187,136,255,0.25);}
+.ov-card.on.force-c {background:rgba(0,212,255,0.07);  border-color:rgba(0,212,255,0.25);}
+.ov-card.on.lissa-c {background:rgba(0,255,136,0.07);  border-color:rgba(0,255,136,0.25);}
+.ov-card.on.dela-c  {background:rgba(255,170,0,0.07);  border-color:rgba(255,170,0,0.25);}
+.ov-card.on.fourier-c{background:rgba(255,136,204,0.07);border-color:rgba(255,136,204,0.25);}
+.ov-card.on.rdiff-c {background:rgba(136,255,204,0.07);border-color:rgba(136,255,204,0.25);}
+
+.ov-symbol{
+  font-size:15px;font-family:"Georgia",serif;
+  font-style:italic;font-weight:400;
+  margin-bottom:1px;
+}
+.hull-c   .ov-symbol{color:#ff8844;}
+.voro-c   .ov-symbol{color:#bb88ff;}
+.force-c  .ov-symbol{color:#00d4ff;}
+.lissa-c  .ov-symbol{color:#00ff88;}
+.dela-c   .ov-symbol{color:#ffaa00;}
+.fourier-c.ov-symbol{color:#ff88cc;}
+.rdiff-c  .ov-symbol{color:#88ffcc;}
+
+.ov-name{
+  font-size:11px;font-weight:700;
+  color:rgba(255,255,255,0.8);letter-spacing:0.2px;
+}
+.ov-desc{
+  font-size:9.5px;color:rgba(255,255,255,0.28);
+  line-height:1.4;
+}
+.ov-card.on .ov-name{color:#fff;}
+.ov-card.on .ov-desc{color:rgba(255,255,255,0.45);}
+
+/* Download modal overlay */
+.modal-bg{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  display:none;align-items:center;justify-content:center;
+  padding:20px;
+}
+.modal-bg.open{display:flex;}
+.modal{
+  background:rgba(12,14,24,0.95);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;padding:22px;
+  width:100%;max-width:340px;
+  backdrop-filter:blur(40px);
+  -webkit-backdrop-filter:blur(40px);
+}
+.modal h2{
+  font-size:15px;font-weight:700;margin-bottom:4px;
+  background:linear-gradient(135deg,#00d4ff,#7850ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.modal p{font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:16px;}
+.modal-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.modal-opt{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 12px;border-radius:12px;cursor:pointer;
+  border:1.5px solid rgba(255,255,255,0.07);
+  background:rgba(255,255,255,0.03);
+  transition:all 0.15s;
+}
+.modal-opt:hover{
+  background:rgba(0,212,255,0.06);
+  border-color:rgba(0,212,255,0.2);
+}
+.modal-opt input[type=radio]{accent-color:#00d4ff;margin-top:2px;flex-shrink:0;}
+.modal-opt-text strong{font-size:12px;font-weight:600;display:block;margin-bottom:2px;}
+.modal-opt-text span{font-size:10px;color:rgba(255,255,255,0.3);}
+.modal-btns{display:flex;gap:8px;}
+.modal-btn{
+  flex:1;padding:10px;border-radius:12px;border:none;
+  font-size:12px;font-weight:700;cursor:pointer;
+  font-family:inherit;transition:all 0.15s;
+}
+.modal-btn:active{transform:scale(0.97);}
+.modal-cancel{
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.5);
+}
+.modal-confirm{
+  background:linear-gradient(135deg,rgba(0,212,255,0.8),rgba(120,80,255,0.8));
+  color:#fff;border:none;
+}
 </style>
 </head>
 <body>
 
+<!-- Download modal -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h2>Download Recording</h2>
+    <p>Choose what to save to your device</p>
+    <div class="modal-opts">
+      <label class="modal-opt">
+        <input type="radio" name="dl" value="overlay" checked>
+        <div class="modal-opt-text">
+          <strong>With overlays</strong>
+          <span>Includes all active mathematical visualisations</span>
+        </div>
+      </label>
+      <label class="modal-opt">
+        <input type="radio" name="dl" value="raw">
+        <div class="modal-opt-text">
+          <strong>Raw video only</strong>
+          <span>Clean footage, no overlays drawn</span>
+        </div>
+      </label>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn modal-confirm" onclick="confirmDownload()">Download</button>
+    </div>
+  </div>
+</div>
+
 <header>
-  <h1>BLOB<span>TRACKER</span></h1>
-  <span class="badge">v11</span>
+  <div>
+    <div class="logo">eigenflow</div>
+    <div class="logo-sub">motion · math · art</div>
+  </div>
+  <span class="badge">v12</span>
   <span id="fps-label">— fps</span>
 </header>
 
@@ -142,78 +353,126 @@ input[type=file] { display: none; }
   <div class="video-wrap">
     <video id="vid" autoplay playsinline muted></video>
     <canvas id="overlay"></canvas>
-    <div class="blob-badge" id="blob-badge">0 blobs</div>
-    <div class="rec-badge" id="rec-badge">
-      <div class="rec-dot"></div> REC
+    <div class="hud">
+      <div class="blob-badge">
+        <div class="blob-dot"></div>
+        <span id="blob-count">0 blobs</span>
+      </div>
+      <div class="rec-badge" id="rec-badge">
+        <div class="rec-dot"></div>
+        <span>recording</span>
+      </div>
     </div>
   </div>
 
   <div class="controls">
 
-    <!-- Source toggle row -->
-    <div class="btn-row">
-      <button class="btn-src" id="btn-cam-src" onclick="setSource('camera')">📷 Camera</button>
-      <button class="btn-src off" id="btn-file-src" onclick="setSource('file')">🎬 Video File</button>
+    <!-- Source -->
+    <div>
+      <div class="sec">Input Source</div>
+      <div class="pill-row">
+        <button class="pill active" id="btn-cam-src"  onclick="setSource('camera')">Camera</button>
+        <button class="pill"        id="btn-file-src" onclick="setSource('file')">Video File</button>
+      </div>
     </div>
 
-    <!-- Camera controls (shown when source = camera) -->
-    <div id="cam-controls" class="btn-row">
-      <button class="btn-cam-f active" id="btn-front" onclick="switchCamera('user')">Front</button>
-      <button class="btn-cam-b" id="btn-back"  onclick="switchCamera('environment')">Back</button>
-      <button class="btn-record" id="btn-record" onclick="toggleRecord()">⏺ Record</button>
-      <button class="btn-download" id="btn-download" onclick="downloadRecording()">⬇ Save</button>
+    <!-- Camera controls -->
+    <div id="cam-controls">
+      <div class="pill-row">
+        <button class="pill active" id="btn-front"    onclick="switchCamera('user')">⌂ Front</button>
+        <button class="pill"        id="btn-back"     onclick="switchCamera('environment')">⊙ Back</button>
+        <button class="pill"        id="btn-record"   onclick="toggleRecord()">⬤ Record</button>
+        <button class="pill"        id="btn-download" onclick="openModal()">↓ Save</button>
+      </div>
     </div>
 
-    <!-- File upload area (hidden when source = camera) -->
+    <!-- File controls -->
     <div id="file-controls" style="display:none">
-      <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
-        <div id="upload-label">Tap to select a video file</div>
+      <div class="upload-zone" id="upload-zone"
+           onclick="document.getElementById('file-input').click()">
+        <span id="upload-label">Tap to select a video file</span>
       </div>
       <input type="file" id="file-input" accept="video/*" onchange="loadVideoFile(this)">
     </div>
 
-    <!-- Detection sliders -->
+    <!-- Sliders -->
     <div>
-      <div class="section-title">Detection</div>
-      <div class="slider-row">
-        <div class="slider-item">
-          <span class="slider-label">Sensitivity</span>
+      <div class="sec">Detection</div>
+      <div class="slider-grid">
+        <div class="slider-row">
+          <span class="slider-lbl">Sensitivity</span>
           <input type="range" min="1" max="50" value="15"
                  oninput="sliders.sensitivity=+this.value;document.getElementById('v-sens').textContent=this.value">
           <span class="slider-val" id="v-sens">15</span>
         </div>
-        <div class="slider-item">
-          <span class="slider-label">Min blob (px²)</span>
+        <div class="slider-row">
+          <span class="slider-lbl">Min blob px²</span>
           <input type="range" min="0" max="3000" value="200" step="50"
                  oninput="sliders.minsize=+this.value;document.getElementById('v-min').textContent=this.value">
           <span class="slider-val" id="v-min">200</span>
         </div>
-        <div class="slider-item">
-          <span class="slider-label">Max blob (px²)</span>
+        <div class="slider-row">
+          <span class="slider-lbl">Max blob px²</span>
           <input type="range" min="500" max="30000" value="15000" step="500"
                  oninput="sliders.maxsize=+this.value;document.getElementById('v-max').textContent=this.value">
           <span class="slider-val" id="v-max">15000</span>
         </div>
-        <div class="slider-item" id="speed-row" style="display:none">
-          <span class="slider-label">Playback speed</span>
+        <div class="slider-row" id="speed-row" style="display:none">
+          <span class="slider-lbl">Playback speed</span>
           <input type="range" min="0.1" max="2" value="1" step="0.1"
-                 oninput="setPlaybackSpeed(+this.value);document.getElementById('v-spd').textContent=this.value+'x'">
-          <span class="slider-val" id="v-spd">1x</span>
+                 oninput="vid.playbackRate=+this.value;document.getElementById('v-spd').textContent=(+this.value).toFixed(1)+'×'">
+          <span class="slider-val" id="v-spd">1×</span>
         </div>
       </div>
     </div>
 
     <!-- Overlays -->
     <div>
-      <div class="section-title">Overlays</div>
-      <div class="toggle-grid">
-        <button class="tog hull"    id="tog-hull"    onclick="toggleOv('hull')">🟤 Convex hull</button>
-        <button class="tog voro"    id="tog-voro"    onclick="toggleOv('voro')">🟣 Voronoi</button>
-        <button class="tog force"   id="tog-force"   onclick="toggleOv('force')">🔵 Force field</button>
-        <button class="tog lissa"   id="tog-lissa"   onclick="toggleOv('lissa')">🟢 Lissajous</button>
-        <button class="tog dela"    id="tog-dela"    onclick="toggleOv('dela')">🟠 Delaunay</button>
-        <button class="tog fourier" id="tog-fourier" onclick="toggleOv('fourier')">🩷 Fourier rings</button>
-        <button class="tog rdiff"   id="tog-rdiff"   onclick="toggleOv('rdiff')">🩵 Reaction diff</button>
+      <div class="sec">Mathematical Overlays</div>
+      <div class="overlay-grid">
+
+        <button class="ov-card hull-c" id="ov-hull" onclick="toggleOv('hull','hull-c')">
+          <div class="ov-symbol">∂Ω</div>
+          <div class="ov-name">Convex Hull</div>
+          <div class="ov-desc">Smallest boundary enclosing all blobs + centroid web</div>
+        </button>
+
+        <button class="ov-card voro-c" id="ov-voro" onclick="toggleOv('voro','voro-c')">
+          <div class="ov-symbol">𝒱</div>
+          <div class="ov-name">Voronoi</div>
+          <div class="ov-desc">Divides space so each pixel belongs to its nearest blob</div>
+        </button>
+
+        <button class="ov-card force-c" id="ov-force" onclick="toggleOv('force','force-c')">
+          <div class="ov-symbol">∇φ</div>
+          <div class="ov-name">Force Field</div>
+          <div class="ov-desc">Blobs as gravity sources — arrows follow inverse square law</div>
+        </button>
+
+        <button class="ov-card lissa-c" id="ov-lissa" onclick="toggleOv('lissa','lissa-c')">
+          <div class="ov-symbol">𝔏</div>
+          <div class="ov-name">Lissajous</div>
+          <div class="ov-desc">Encodes x/y motion as parametric sine curves per blob</div>
+        </button>
+
+        <button class="ov-card dela-c" id="ov-dela" onclick="toggleOv('dela','dela-c')">
+          <div class="ov-symbol">△</div>
+          <div class="ov-name">Delaunay</div>
+          <div class="ov-desc">Optimal triangle mesh — no blob inside any circumscribed circle</div>
+        </button>
+
+        <button class="ov-card fourier-c" id="ov-fourier" onclick="toggleOv('fourier','fourier-c')">
+          <div class="ov-symbol">∑ω</div>
+          <div class="ov-name">Fourier Rings</div>
+          <div class="ov-desc">Direction changes emit rings — interference reveals motion frequency</div>
+        </button>
+
+        <button class="ov-card rdiff-c" id="ov-rdiff" onclick="toggleOv('rdiff','rdiff-c')">
+          <div class="ov-symbol">∂u/∂t</div>
+          <div class="ov-name">Reaction Diffusion</div>
+          <div class="ov-desc">Turing pattern PDE seeded by blobs — grows organic texture</div>
+        </button>
+
       </div>
     </div>
 
@@ -221,191 +480,204 @@ input[type=file] { display: none; }
 </div>
 
 <script>
-// ─── CONSTANTS ───────────────────────────────
-const TRAIL_LEN    = 300;
-const TRAIL_COLOR  = '#00ff88';
-const OVERLAP_COL  = '#ff453a';
+// ─── CONSTANTS ────────────────────────────────
+const TRAIL_LEN   = 300;
+const OVERLAP_COL = '#ff453a';
 
 // ─── STATE ───────────────────────────────────
-let source      = 'camera';   // 'camera' | 'file'
-let facingMode  = 'user';
-let stream      = null;
-let animId      = null;
-let prevFrame   = null;
-let blobTrails  = {};
-let nextId      = 0;
-let recording   = false;
-let mediaRec    = null;
-let recChunks   = [];
-let recBlob     = null;
-let lastTime    = performance.now();
-let frameCount  = 0;
+let source     = 'camera';
+let facingMode = 'user';
+let stream     = null;
+let animId     = null;
+let prevFrame  = null;
+let blobTrails = {};
+let nextId     = 0;
+let recording  = false;
+let mediaRec   = null;
+let recChunks  = [];
+let recBlob    = null;
+let rawChunks  = [];
+let rawRec     = null;
+let rawBlob    = null;
+let lastTime   = performance.now();
+let frameCount = 0;
 
-const sliders   = { sensitivity:15, minsize:200, maxsize:15000 };
-const ovs       = { hull:false, voro:false, force:false,
-                    lissa:false, dela:false, fourier:false, rdiff:false };
+const sliders  = { sensitivity:15, minsize:200, maxsize:15000 };
+const ovs      = { hull:false,voro:false,force:false,
+                   lissa:false,dela:false,fourier:false,rdiff:false };
 
-// Reaction diffusion buffers
-let rdA = null, rdB = null, rdW = 0, rdH = 0;
-const RD_SCALE  = 4;   // run RD at 1/4 res for performance
-
-// Fourier ring history
-let fourierRings = [];   // [{x,y,r,age,maxR}]
-
-// Lissajous history per blob: tid → {xs:[], ys:[]}
-let lissaHistory = {};
+let rdA=null,rdB=null,rdW=0,rdH=0;
+const RD_SCALE=4;
+let fourierRings=[];
+let lissaHistory={};
 
 // ─── ELEMENTS ────────────────────────────────
 const vid  = document.getElementById('vid');
 const cvs  = document.getElementById('overlay');
-const ctx  = cvs.getContext('2d', { willReadFrequently:true });
+const ctx  = cvs.getContext('2d',{willReadFrequently:true});
 const offC = document.createElement('canvas');
-const offX = offC.getContext('2d', { willReadFrequently:true });
+const offX = offC.getContext('2d',{willReadFrequently:true});
 
-// ─── SOURCE TOGGLE ───────────────────────────
-function setSource(s) {
-  source = s;
-  document.getElementById('btn-cam-src').classList.toggle('off', s !== 'camera');
-  document.getElementById('btn-file-src').classList.toggle('off', s !== 'file');
-  document.getElementById('cam-controls').style.display = s === 'camera' ? 'flex'  : 'none';
-  document.getElementById('file-controls').style.display = s === 'file'  ? 'block' : 'none';
-  document.getElementById('speed-row').style.display     = s === 'file'  ? 'flex'  : 'none';
-  if (s === 'camera') {
-    vid.loop = false;
+// Raw capture canvas (video only, no overlays)
+const rawC = document.createElement('canvas');
+const rawX = rawC.getContext('2d');
+
+// ─── MODAL ───────────────────────────────────
+function openModal(){
+  if(!recBlob&&!rawBlob){alert('Record something first.');return;}
+  document.getElementById('modal-bg').classList.add('open');
+}
+function closeModal(){
+  document.getElementById('modal-bg').classList.remove('open');
+}
+function confirmDownload(){
+  const choice=document.querySelector('input[name=dl]:checked').value;
+  const blob  = choice==='overlay' ? recBlob : rawBlob;
+  const label = choice==='overlay' ? 'eigenflow-overlay' : 'eigenflow-raw';
+  if(!blob){alert('No recording found for that option.');return;}
+  const a=Object.assign(document.createElement('a'),{
+    href:URL.createObjectURL(blob),
+    download:label+'-'+new Date().toISOString().slice(0,19).replace(/:/g,'-')+'.webm'
+  });
+  a.click();URL.revokeObjectURL(a.href);
+  closeModal();
+}
+
+// ─── SOURCE ──────────────────────────────────
+function setSource(s){
+  source=s;
+  document.getElementById('btn-cam-src').classList.toggle('active',s==='camera');
+  document.getElementById('btn-file-src').classList.toggle('active',s==='file');
+  document.getElementById('cam-controls').style.display=s==='camera'?'block':'none';
+  document.getElementById('file-controls').style.display=s==='file'?'block':'none';
+  document.getElementById('speed-row').style.display=s==='file'?'flex':'none';
+  if(s==='camera'){
+    vid.loop=false;
     startCamera(facingMode);
   } else {
-    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-    vid.srcObject = null;
+    if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+    vid.srcObject=null;
   }
   resetState();
 }
 
 // ─── CAMERA ──────────────────────────────────
-async function startCamera(facing) {
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:{ideal:facing}, width:{ideal:1280}, height:{ideal:720} },
+async function startCamera(facing){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:720}},
       audio:false
     });
-    vid.srcObject = stream;
-    vid.loop      = false;
+    vid.srcObject=stream;vid.loop=false;
     await vid.play();
-    facingMode = facing;
-    document.getElementById('btn-front').classList.toggle('active', facing==='user');
-    document.getElementById('btn-back').classList.toggle('active',  facing==='environment');
+    facingMode=facing;
+    document.getElementById('btn-front').classList.toggle('active',facing==='user');
+    document.getElementById('btn-back').classList.toggle('active',facing==='environment');
     resetState();
-  } catch(e) {
-    alert('Camera error: ' + e.message);
-  }
+  } catch(e){alert('Camera error: '+e.message);}
 }
-
-function switchCamera(f) { startCamera(f); }
+function switchCamera(f){startCamera(f);}
 
 // ─── VIDEO FILE ───────────────────────────────
-function loadVideoFile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const url  = URL.createObjectURL(file);
-  vid.srcObject = null;
-  vid.src       = url;
-  vid.loop      = false;
-  vid.playbackRate = parseFloat(document.querySelector('#speed-row input').value) || 1;
+function loadVideoFile(input){
+  const file=input.files[0]; if(!file) return;
+  vid.srcObject=null;
+  vid.src=URL.createObjectURL(file);
+  vid.loop=true;   // loop video file
+  vid.playbackRate=parseFloat(document.querySelector('#speed-row input').value)||1;
   vid.play();
-  const lbl = file.name.length > 28 ? file.name.slice(0,25)+'...' : file.name;
-  document.getElementById('upload-label').textContent = '▶  ' + lbl;
-  document.getElementById('upload-area').classList.add('has-file');
+  const lbl=file.name.length>26?file.name.slice(0,23)+'…':file.name;
+  document.getElementById('upload-label').textContent='▶  '+lbl;
+  document.getElementById('upload-zone').classList.add('loaded');
   resetState();
 }
 
-function setPlaybackSpeed(v) {
-  vid.playbackRate = v;
-}
-
 // ─── RECORDING ───────────────────────────────
-function toggleRecord() {
-  recording ? stopRecording() : startRecording();
-}
-function startRecording() {
-  recChunks = []; recBlob = null;
-  try {
-    mediaRec = new MediaRecorder(cvs.captureStream(30),
-                                 { mimeType:'video/webm;codecs=vp9' });
-  } catch(e) {
-    mediaRec = new MediaRecorder(cvs.captureStream(30));
+function toggleRecord(){recording?stopRecording():startRecording();}
+
+function startRecording(){
+  recChunks=[];rawChunks=[];recBlob=null;rawBlob=null;
+
+  // Overlay recorder (canvas with blobs)
+  try{
+    mediaRec=new MediaRecorder(cvs.captureStream(30),{mimeType:'video/webm;codecs=vp9'});
+  }catch(e){
+    mediaRec=new MediaRecorder(cvs.captureStream(30));
   }
-  mediaRec.ondataavailable = e => { if(e.data?.size>0) recChunks.push(e.data); };
-  mediaRec.onstop = () => {
-    recBlob = new Blob(recChunks, { type:'video/webm' });
-    document.getElementById('btn-download').classList.add('ready');
+  mediaRec.ondataavailable=e=>{if(e.data?.size>0)recChunks.push(e.data);};
+  mediaRec.onstop=()=>{
+    recBlob=new Blob(recChunks,{type:'video/webm'});
   };
-  mediaRec.start(100);
-  recording = true;
-  document.getElementById('btn-record').classList.add('recording');
-  document.getElementById('btn-record').textContent = '⏹ Stop';
+
+  // Raw recorder (video only canvas)
+  try{
+    rawRec=new MediaRecorder(rawC.captureStream(30),{mimeType:'video/webm;codecs=vp9'});
+  }catch(e){
+    rawRec=new MediaRecorder(rawC.captureStream(30));
+  }
+  rawRec.ondataavailable=e=>{if(e.data?.size>0)rawChunks.push(e.data);};
+  rawRec.onstop=()=>{
+    rawBlob=new Blob(rawChunks,{type:'video/webm'});
+    document.getElementById('btn-download').classList.add('save-ready');
+  };
+
+  mediaRec.start(100);rawRec.start(100);
+  recording=true;
+  document.getElementById('btn-record').classList.add('rec-on');
+  document.getElementById('btn-record').textContent='■ Stop';
   document.getElementById('rec-badge').classList.add('active');
 }
-function stopRecording() {
-  if (mediaRec?.state !== 'inactive') mediaRec.stop();
-  recording = false;
-  document.getElementById('btn-record').classList.remove('recording');
-  document.getElementById('btn-record').textContent = '⏺ Record';
+
+function stopRecording(){
+  if(mediaRec?.state!=='inactive') mediaRec.stop();
+  if(rawRec?.state!=='inactive')   rawRec.stop();
+  recording=false;
+  document.getElementById('btn-record').classList.remove('rec-on');
+  document.getElementById('btn-record').textContent='⬤ Record';
   document.getElementById('rec-badge').classList.remove('active');
 }
-function downloadRecording() {
-  if (!recBlob) { alert('Record something first.'); return; }
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(recBlob),
-    download: 'blobtracker-' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.webm'
-  });
-  a.click();
-  URL.revokeObjectURL(a.href);
+
+// ─── OVERLAY TOGGLES ─────────────────────────
+function toggleOv(k,cls){
+  ovs[k]=!ovs[k];
+  document.getElementById('ov-'+k).classList.toggle('on',ovs[k]);
+  if(k==='rdiff'&&ovs[k]) initRD();
 }
 
-// ─── UI HELPERS ──────────────────────────────
-function toggleOv(k) {
-  ovs[k] = !ovs[k];
-  document.getElementById('tog-'+k).classList.toggle('on', ovs[k]);
-  if (k === 'rdiff' && ovs[k]) initRD();
-}
-
-function resetState() {
-  prevFrame    = null;
-  blobTrails   = {};
-  lissaHistory = {};
-  fourierRings = [];
-  rdA = null; rdB = null;
-  nextId = 0;
+function resetState(){
+  prevFrame=null;blobTrails={};
+  lissaHistory={};fourierRings=[];
+  rdA=null;rdB=null;nextId=0;
 }
 
 // ─── BLOB MATCHING ───────────────────────────
-function matchBlobs(prev, centroids) {
-  const out={}, used=new Set(), MAX=80;
-  for (const [cx,cy] of centroids) {
-    let bid=null, bd=MAX;
-    for (const [tid,tr] of Object.entries(prev)) {
-      if (used.has(tid)||!tr.length) continue;
+function matchBlobs(prev,centroids){
+  const out={},used=new Set(),MAX=80;
+  for(const [cx,cy] of centroids){
+    let bid=null,bd=MAX;
+    for(const [tid,tr] of Object.entries(prev)){
+      if(used.has(tid)||!tr.length) continue;
       const l=tr[tr.length-1];
-      const d=Math.hypot(cx-l.x, cy-l.y);
-      if (d<bd){bd=d;bid=tid;}
+      const d=Math.hypot(cx-l.x,cy-l.y);
+      if(d<bd){bd=d;bid=tid;}
     }
-    if (bid!==null) {
+    if(bid!==null){
       used.add(bid);
-      const t=prev[bid]; t.push({x:cx,y:cy});
+      const t=prev[bid];t.push({x:cx,y:cy});
       if(t.length>TRAIL_LEN) t.shift();
       out[bid]=t;
     } else {
-      out[nextId]=[{x:cx,y:cy}];
-      nextId++;
+      out[nextId]=[{x:cx,y:cy}];nextId++;
     }
   }
   return out;
 }
 
-// ─── MOTION DETECTION ────────────────────────
-function getMotionMask(curr, prev, W, H, thr) {
-  const m = new Uint8Array(W*H);
-  for (let i=0;i<W*H;i++) {
+// ─── MOTION ──────────────────────────────────
+function getMotionMask(curr,prev,W,H,thr){
+  const m=new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++){
     const p=i*4;
     const lc=0.299*curr[p]+0.587*curr[p+1]+0.114*curr[p+2];
     const lp=0.299*prev[p]+0.587*prev[p+1]+0.114*prev[p+2];
@@ -413,11 +685,11 @@ function getMotionMask(curr, prev, W, H, thr) {
   }
   return m;
 }
-function dilateMask(m,W,H,r=4) {
+function dilateMask(m,W,H,r=4){
   const o=new Uint8Array(W*H);
-  for(let y=0;y<H;y++) for(let x=0;x<W;x++) {
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
     let f=false;
-    outer: for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+    outer:for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
       const nx=x+dx,ny=y+dy;
       if(nx<0||nx>=W||ny<0||ny>=H) continue;
       if(m[ny*W+nx]===255){f=true;break outer;}
@@ -426,20 +698,20 @@ function dilateMask(m,W,H,r=4) {
   }
   return o;
 }
-function findBlobs(m,W,H,minA,maxA) {
-  const vis=new Uint8Array(W*H), blobs=[];
+function findBlobs(m,W,H,minA,maxA){
+  const vis=new Uint8Array(W*H),blobs=[];
   for(let sy=0;sy<H;sy++) for(let sx=0;sx<W;sx++){
     const si=sy*W+sx;
     if(m[si]!==255||vis[si]) continue;
-    const q=[si]; vis[si]=1;
+    const q=[si];vis[si]=1;
     let mnx=sx,mxx=sx,mny=sy,mxy=sy,px=0;
     while(q.length){
-      const i=q.shift(), qx=i%W, qy=(i-qx)/W;
-      px++; mnx=Math.min(mnx,qx); mxx=Math.max(mxx,qx);
-      mny=Math.min(mny,qy); mxy=Math.max(mxy,qy);
+      const i=q.shift(),qx=i%W,qy=(i-qx)/W;
+      px++;mnx=Math.min(mnx,qx);mxx=Math.max(mxx,qx);
+      mny=Math.min(mny,qy);mxy=Math.max(mxy,qy);
       for(const n of [i-1,i+1,i-W,i+W]){
         if(n<0||n>=W*H||vis[n]||m[n]!==255) continue;
-        vis[n]=1; q.push(n);
+        vis[n]=1;q.push(n);
       }
     }
     const bw=mxx-mnx+1,bh=mxy-mny+1;
@@ -451,8 +723,7 @@ function findBlobs(m,W,H,minA,maxA) {
   return blobs;
 }
 
-// ─── CONTRAST COLOR ──────────────────────────
-function contrastColor(d,x,y,w,h,W,H) {
+function contrastColor(d,x,y,w,h,W,H){
   let s=0,c=0;
   for(let iy=Math.max(0,y-8);iy<Math.min(H,y+4);iy++)
     for(let ix=Math.max(0,x);ix<Math.min(W,x+w);ix++){
@@ -462,339 +733,6 @@ function contrastColor(d,x,y,w,h,W,H) {
   return c&&s/c<128?'#00f5ff':'#3c14dc';
 }
 
-// ─── CONVEX HULL ─────────────────────────────
-function cross(O,A,B){
-  return (A[0]-O[0])*(B[1]-O[1])-(A[1]-O[1])*(B[0]-O[0]);
-}
-function convexHull(pts){
-  const n=pts.length; if(n<3) return pts;
-  const p=[...pts].sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
-  const lo=[],hi=[];
-  for(const pt of p){
-    while(lo.length>=2&&cross(lo[lo.length-2],lo[lo.length-1],pt)<=0) lo.pop();
-    lo.push(pt);
-  }
-  for(let i=p.length-1;i>=0;i--){
-    const pt=p[i];
-    while(hi.length>=2&&cross(hi[hi.length-2],hi[hi.length-1],pt)<=0) hi.pop();
-    hi.push(pt);
-  }
-  return lo.slice(0,-1).concat(hi.slice(0,-1));
-}
-function drawHull(c2,blobs){
-  if(blobs.length<2) return;
-  const pts=blobs.map(b=>[b.cx,b.cy]);
-  const gcx=pts.reduce((s,p)=>s+p[0],0)/pts.length;
-  const gcy=pts.reduce((s,p)=>s+p[1],0)/pts.length;
-  c2.strokeStyle='#ff8844'; c2.fillStyle='#ff8844'; c2.lineWidth=1;
-  for(const b of blobs){
-    c2.beginPath(); c2.moveTo(b.cx,b.cy); c2.lineTo(gcx,gcy); c2.stroke();
-  }
-  c2.beginPath(); c2.arc(gcx,gcy,5,0,Math.PI*2); c2.fill();
-  c2.font='11px -apple-system,sans-serif';
-  c2.fillText('G',gcx+7,gcy+4);
-  if(blobs.length>=3){
-    const h=convexHull(pts);
-    c2.beginPath(); c2.moveTo(h[0][0],h[0][1]);
-    for(let i=1;i<h.length;i++) c2.lineTo(h[i][0],h[i][1]);
-    c2.closePath(); c2.stroke();
-  }
-}
-
-// ─── VORONOI ─────────────────────────────────
-// Uses a fast jump-flood approach on a small canvas then scales up
-function drawVoronoi(c2,blobs,W,H){
-  if(blobs.length<2) return;
-  const S=4, sw=Math.ceil(W/S), sh=Math.ceil(H/S);
-  const vc=document.createElement('canvas');
-  vc.width=sw; vc.height=sh;
-  const vx=vc.getContext('2d');
-  // Colour palette per blob
-  const cols=['#bb88ff22','#00cfff22','#ff888822','#00ff8822',
-              '#ffaa0022','#ff88cc22','#88ffcc22','#4f8ef722'];
-  // For each pixel find nearest blob
-  const id=new ImageData(sw,sh);
-  for(let y=0;y<sh;y++) for(let x=0;x<sw;x++){
-    let bd=Infinity,bc=0;
-    for(let i=0;i<blobs.length;i++){
-      const d=Math.hypot(x*S-blobs[i].cx, y*S-blobs[i].cy);
-      if(d<bd){bd=d;bc=i;}
-    }
-    const col=hexToRgb(cols[bc%cols.length]);
-    const p=(y*sw+x)*4;
-    id.data[p]=col[0]; id.data[p+1]=col[1];
-    id.data[p+2]=col[2]; id.data[p+3]=col[3];
-  }
-  vx.putImageData(id,0,0);
-  c2.save();
-  c2.globalAlpha=0.55;
-  c2.imageSmoothingEnabled=false;
-  c2.drawImage(vc,0,0,W,H);
-  c2.restore();
-  // Draw cell borders
-  c2.strokeStyle='rgba(187,136,255,0.4)';
-  c2.lineWidth=0.5;
-  // Approximate borders by edge detection on nearest-blob grid
-  const grid=new Int16Array(sw*sh);
-  for(let y=0;y<sh;y++) for(let x=0;x<sw;x++){
-    let bc=0,bd=Infinity;
-    for(let i=0;i<blobs.length;i++){
-      const d=Math.hypot(x*S-blobs[i].cx, y*S-blobs[i].cy);
-      if(d<bd){bd=d;bc=i;}
-    }
-    grid[y*sw+x]=bc;
-  }
-  c2.beginPath();
-  for(let y=0;y<sh-1;y++) for(let x=0;x<sw-1;x++){
-    const c=grid[y*sw+x];
-    if(grid[y*sw+x+1]!==c||grid[(y+1)*sw+x]!==c){
-      c2.moveTo(x*S,y*S); c2.lineTo((x+1)*S,y*S);
-    }
-  }
-  c2.stroke();
-}
-function hexToRgb(hex){
-  const r=parseInt(hex.slice(1,3),16)||0;
-  const g=parseInt(hex.slice(3,5),16)||0;
-  const b=parseInt(hex.slice(5,7),16)||0;
-  const a=hex.length>7?parseInt(hex.slice(7,9),16):255;
-  return [r,g,b,a];
-}
-
-// ─── FORCE FIELD ─────────────────────────────
-function drawForceField(c2,blobs,W,H){
-  if(!blobs.length) return;
-  const step=28;
-  c2.strokeStyle='rgba(0,207,255,0.55)';
-  c2.fillStyle='rgba(0,207,255,0.55)';
-  c2.lineWidth=0.8;
-  for(let y=step/2;y<H;y+=step) for(let x=step/2;x<W;x+=step){
-    let fx=0,fy=0;
-    for(const b of blobs){
-      const dx=b.cx-x, dy=b.cy-y;
-      const d2=dx*dx+dy*dy+1;
-      const f=3000/d2;
-      fx+=f*dx/Math.sqrt(d2);
-      fy+=f*dy/Math.sqrt(d2);
-    }
-    const mag=Math.hypot(fx,fy);
-    if(mag<0.3) continue;
-    const sc=Math.min(12,mag);
-    const nx=fx/mag, ny=fy/mag;
-    const ex=x+nx*sc, ey=y+ny*sc;
-    c2.beginPath(); c2.moveTo(x,y); c2.lineTo(ex,ey); c2.stroke();
-    // arrowhead
-    const angle=Math.atan2(ey-y,ex-x);
-    c2.beginPath();
-    c2.moveTo(ex,ey);
-    c2.lineTo(ex-5*Math.cos(angle-0.4),ey-5*Math.sin(angle-0.4));
-    c2.lineTo(ex-5*Math.cos(angle+0.4),ey-5*Math.sin(angle+0.4));
-    c2.closePath(); c2.fill();
-  }
-}
-
-// ─── LISSAJOUS ───────────────────────────────
-function updateLissa(blobs){
-  const ids=new Set(blobs.map((_,i)=>{
-    const tid=findTid(blobs[i].cx,blobs[i].cy);
-    return tid;
-  }));
-  // Prune old
-  for(const k of Object.keys(lissaHistory)){
-    if(!ids.has(+k)) delete lissaHistory[k];
-  }
-}
-function drawLissajous(c2,blobs,W,H){
-  for(const b of blobs){
-    const tid=findTid(b.cx,b.cy);
-    if(tid===null) continue;
-    if(!lissaHistory[tid]) lissaHistory[tid]={xs:[],ys:[]};
-    const lh=lissaHistory[tid];
-    lh.xs.push(b.cx); lh.ys.push(b.cy);
-    if(lh.xs.length>TRAIL_LEN){ lh.xs.shift(); lh.ys.shift(); }
-    if(lh.xs.length<4) continue;
-    // Map x motion to cosine, y motion to sine → parametric
-    const n=lh.xs.length;
-    const cx0=lh.xs.reduce((s,v)=>s+v,0)/n;
-    const cy0=lh.ys.reduce((s,v)=>s+v,0)/n;
-    const ax=Math.max(...lh.xs)-Math.min(...lh.xs)||1;
-    const ay=Math.max(...lh.ys)-Math.min(...lh.ys)||1;
-    c2.strokeStyle='rgba(0,255,136,0.7)';
-    c2.lineWidth=1;
-    c2.beginPath();
-    for(let i=0;i<n;i++){
-      const t=i/n*Math.PI*2;
-      // Lissajous: encode x-displacement as A*cos(t), y-displacement as B*sin(t)
-      const px=b.cx + (lh.xs[i]-cx0)/ax * 40 * Math.cos(t*1.5);
-      const py=b.cy + (lh.ys[i]-cy0)/ay * 40 * Math.sin(t*2);
-      i===0 ? c2.moveTo(px,py) : c2.lineTo(px,py);
-    }
-    c2.stroke();
-  }
-}
-
-// ─── DELAUNAY ────────────────────────────────
-// Bowyer-Watson algorithm
-function delaunay(points){
-  if(points.length<3) return [];
-  const M=100000;
-  const superTri=[[-M,-M],[M*3,-M],[0,M*3]];
-  let tris=[[0,1,2]];
-  const pts=[...superTri,...points];
-  for(let pi=3;pi<pts.length;pi++){
-    const px=pts[pi][0], py=pts[pi][1];
-    const bad=[];
-    for(const t of tris){
-      const [ax,ay]=pts[t[0]], [bx,by]=pts[t[1]], [cx2,cy2]=pts[t[2]];
-      const D=2*(ax*(by-cy2)+bx*(cy2-ay)+cx2*(ay-by));
-      if(Math.abs(D)<1e-10) continue;
-      const ux=((ax*ax+ay*ay)*(by-cy2)+(bx*bx+by*by)*(cy2-ay)+(cx2*cx2+cy2*cy2)*(ay-by))/D;
-      const uy=((ax*ax+ay*ay)*(cx2-bx)+(bx*bx+by*by)*(ax-cx2)+(cx2*cx2+cy2*cy2)*(bx-ax))/D;
-      const r=Math.hypot(ax-ux,ay-uy);
-      if(Math.hypot(px-ux,py-uy)<r) bad.push(t);
-    }
-    const boundary=[];
-    for(const t of bad){
-      for(let i=0;i<3;i++){
-        const e=[t[i],t[(i+1)%3]];
-        const shared=bad.some(t2=>t2!==t&&t2.includes(e[0])&&t2.includes(e[1]));
-        if(!shared) boundary.push(e);
-      }
-    }
-    for(const t of bad){
-      const i=tris.indexOf(t);
-      if(i>-1) tris.splice(i,1);
-    }
-    for(const e of boundary) tris.push([e[0],e[1],pi]);
-  }
-  return tris.filter(t=>!t.some(i=>i<3))
-             .map(t=>t.map(i=>[pts[i][0],pts[i][1]]));
-}
-function drawDelaunay(c2,blobs){
-  if(blobs.length<3) return;
-  const pts=blobs.map(b=>[b.cx,b.cy]);
-  const tris=delaunay(pts);
-  c2.strokeStyle='rgba(255,170,0,0.55)';
-  c2.fillStyle='rgba(255,170,0,0.06)';
-  c2.lineWidth=0.8;
-  for(const t of tris){
-    c2.beginPath();
-    c2.moveTo(t[0][0],t[0][1]);
-    c2.lineTo(t[1][0],t[1][1]);
-    c2.lineTo(t[2][0],t[2][1]);
-    c2.closePath();
-    c2.fill(); c2.stroke();
-  }
-}
-
-// ─── FOURIER RINGS ───────────────────────────
-function updateFourierRings(blobs,prevBlobs){
-  // Emit a ring when a blob changes direction significantly
-  for(const b of blobs){
-    const tid=findTid(b.cx,b.cy);
-    if(tid===null) continue;
-    const tr=blobTrails[tid];
-    if(!tr||tr.length<4) continue;
-    const n=tr.length;
-    const v1x=tr[n-2].x-tr[n-3].x, v1y=tr[n-2].y-tr[n-3].y;
-    const v2x=tr[n-1].x-tr[n-2].x, v2y=tr[n-1].y-tr[n-2].y;
-    const dot=v1x*v2x+v1y*v2y;
-    const m1=Math.hypot(v1x,v1y), m2=Math.hypot(v2x,v2y);
-    if(m1<1||m2<1) continue;
-    const angle=Math.acos(Math.max(-1,Math.min(1,dot/(m1*m2))));
-    const speed=Math.hypot(v2x,v2y);
-    if(angle>0.2&&speed>2){
-      fourierRings.push({ x:b.cx, y:b.cy, r:0,
-                          maxR: 30+speed*4, age:0 });
-    }
-  }
-  // Age rings
-  fourierRings = fourierRings
-    .map(r=>({...r, r:r.r+2.5, age:r.age+1}))
-    .filter(r=>r.r<r.maxR);
-}
-function drawFourierRings(c2){
-  for(const r of fourierRings){
-    const alpha=1-(r.r/r.maxR);
-    c2.strokeStyle=`rgba(255,136,204,${alpha*0.7})`;
-    c2.lineWidth=0.8;
-    c2.beginPath();
-    c2.arc(r.x,r.y,r.r,0,Math.PI*2);
-    c2.stroke();
-    // Harmonic inner ring at half radius
-    if(r.r>10){
-      c2.strokeStyle=`rgba(255,136,204,${alpha*0.3})`;
-      c2.beginPath();
-      c2.arc(r.x,r.y,r.r*0.5,0,Math.PI*2);
-      c2.stroke();
-    }
-  }
-}
-
-// ─── REACTION DIFFUSION ──────────────────────
-function initRD(){
-  const w=Math.ceil(cvs.width/RD_SCALE)||80;
-  const h=Math.ceil(cvs.height/RD_SCALE)||60;
-  if(rdW===w&&rdH===h&&rdA) return;
-  rdW=w; rdH=h;
-  rdA=new Float32Array(w*h).fill(1);
-  rdB=new Float32Array(w*h).fill(0);
-}
-function seedRD(blobs,W,H){
-  if(!rdA) return;
-  for(const b of blobs){
-    const sx=Math.floor(b.cx/RD_SCALE);
-    const sy=Math.floor(b.cy/RD_SCALE);
-    for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){
-      const nx=sx+dx, ny=sy+dy;
-      if(nx<0||nx>=rdW||ny<0||ny>=rdH) continue;
-      rdB[ny*rdW+nx]=1;
-    }
-  }
-}
-function stepRD(steps=3){
-  if(!rdA) return;
-  // Gray-Scott model: dA/dt = Da*∇²A - A*B² + f*(1-A)
-  //                  dB/dt = Db*∇²B + A*B² - (k+f)*B
-  const Da=0.16, Db=0.08, f=0.060, k=0.062;
-  const nA=new Float32Array(rdA), nB=new Float32Array(rdB);
-  const W=rdW, H=rdH;
-  for(let s=0;s<steps;s++){
-    for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
-      const i=y*W+x;
-      const lapA=rdA[i-1]+rdA[i+1]+rdA[i-W]+rdA[i+W]-4*rdA[i];
-      const lapB=rdB[i-1]+rdB[i+1]+rdB[i-W]+rdB[i+W]-4*rdB[i];
-      const a=rdA[i], b=rdB[i];
-      const abb=a*b*b;
-      nA[i]=Math.max(0,Math.min(1, a+Da*lapA-abb+f*(1-a)));
-      nB[i]=Math.max(0,Math.min(1, b+Db*lapB+abb-(k+f)*b));
-    }
-    rdA.set(nA); rdB.set(nB);
-  }
-}
-function drawRD(c2,W,H){
-  if(!rdA||!rdB) return;
-  const id=new ImageData(rdW,rdH);
-  for(let i=0;i<rdW*rdH;i++){
-    const v=Math.max(0,Math.min(255, (rdA[i]-rdB[i])*255));
-    const p=i*4;
-    // Map to teal/dark palette
-    id.data[p]  =Math.round((1-rdA[i])*0+rdB[i]*136);
-    id.data[p+1]=Math.round(rdA[i]*80+rdB[i]*255);
-    id.data[p+2]=Math.round(rdA[i]*60+rdB[i]*204);
-    id.data[p+3]=Math.round(rdB[i]*180);
-  }
-  const tc=document.createElement('canvas');
-  tc.width=rdW; tc.height=rdH;
-  tc.getContext('2d').putImageData(id,0,0);
-  c2.save();
-  c2.globalAlpha=0.75;
-  c2.imageSmoothingEnabled=true;
-  c2.drawImage(tc,0,0,W,H);
-  c2.restore();
-}
-
-// ─── HELPERS ─────────────────────────────────
 function findTid(cx,cy){
   let best=null,bd=40;
   for(const [tid,tr] of Object.entries(blobTrails)){
@@ -806,27 +744,274 @@ function findTid(cx,cy){
   return best;
 }
 
+// ─── CONVEX HULL ─────────────────────────────
+function cross(O,A,B){
+  return(A[0]-O[0])*(B[1]-O[1])-(A[1]-O[1])*(B[0]-O[0]);
+}
+function convexHull(pts){
+  const n=pts.length;if(n<3) return pts;
+  const p=[...pts].sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  const lo=[],hi=[];
+  for(const pt of p){while(lo.length>=2&&cross(lo[lo.length-2],lo[lo.length-1],pt)<=0)lo.pop();lo.push(pt);}
+  for(let i=p.length-1;i>=0;i--){const pt=p[i];while(hi.length>=2&&cross(hi[hi.length-2],hi[hi.length-1],pt)<=0)hi.pop();hi.push(pt);}
+  return lo.slice(0,-1).concat(hi.slice(0,-1));
+}
+function drawHull(c2,blobs){
+  if(blobs.length<2) return;
+  const pts=blobs.map(b=>[b.cx,b.cy]);
+  const gcx=pts.reduce((s,p)=>s+p[0],0)/pts.length;
+  const gcy=pts.reduce((s,p)=>s+p[1],0)/pts.length;
+  c2.strokeStyle='rgba(255,136,68,0.6)';c2.fillStyle='rgba(255,136,68,0.6)';c2.lineWidth=1;
+  for(const b of blobs){c2.beginPath();c2.moveTo(b.cx,b.cy);c2.lineTo(gcx,gcy);c2.stroke();}
+  c2.beginPath();c2.arc(gcx,gcy,5,0,Math.PI*2);c2.fill();
+  c2.font='11px -apple-system,sans-serif';c2.fillText('G',gcx+7,gcy+4);
+  if(blobs.length>=3){
+    const h=convexHull(pts);
+    c2.beginPath();c2.moveTo(h[0][0],h[0][1]);
+    for(let i=1;i<h.length;i++) c2.lineTo(h[i][0],h[i][1]);
+    c2.closePath();c2.stroke();
+  }
+}
+
+// ─── VORONOI ─────────────────────────────────
+function hexToRgb(hex){
+  return[parseInt(hex.slice(1,3),16)||0,parseInt(hex.slice(3,5),16)||0,
+         parseInt(hex.slice(5,7),16)||0,hex.length>7?parseInt(hex.slice(7,9),16):255];
+}
+function drawVoronoi(c2,blobs,W,H){
+  if(blobs.length<2) return;
+  const S=4,sw=Math.ceil(W/S),sh=Math.ceil(H/S);
+  const cols=['#bb88ff33','#00d4ff33','#ff884433','#00ff8833',
+              '#ffaa0033','#ff88cc33','#88ffcc33','#4f8ef733'];
+  const grid=new Int16Array(sw*sh);
+  const id=new ImageData(sw,sh);
+  for(let y=0;y<sh;y++) for(let x=0;x<sw;x++){
+    let bd=Infinity,bc=0;
+    for(let i=0;i<blobs.length;i++){
+      const d=Math.hypot(x*S-blobs[i].cx,y*S-blobs[i].cy);
+      if(d<bd){bd=d;bc=i;}
+    }
+    grid[y*sw+x]=bc;
+    const col=hexToRgb(cols[bc%cols.length]);
+    const p=(y*sw+x)*4;
+    id.data[p]=col[0];id.data[p+1]=col[1];id.data[p+2]=col[2];id.data[p+3]=col[3];
+  }
+  const vc=document.createElement('canvas');vc.width=sw;vc.height=sh;
+  vc.getContext('2d').putImageData(id,0,0);
+  c2.save();c2.globalAlpha=0.6;c2.imageSmoothingEnabled=false;
+  c2.drawImage(vc,0,0,W,H);c2.restore();
+  c2.strokeStyle='rgba(187,136,255,0.3)';c2.lineWidth=0.5;c2.beginPath();
+  for(let y=0;y<sh-1;y++) for(let x=0;x<sw-1;x++){
+    const c=grid[y*sw+x];
+    if(grid[y*sw+x+1]!==c||grid[(y+1)*sw+x]!==c){
+      c2.moveTo(x*S,y*S);c2.lineTo((x+1)*S,y*S);
+    }
+  }
+  c2.stroke();
+}
+
+// ─── FORCE FIELD ─────────────────────────────
+function drawForceField(c2,blobs,W,H){
+  if(!blobs.length) return;
+  const step=28;
+  c2.strokeStyle='rgba(0,212,255,0.45)';
+  c2.fillStyle='rgba(0,212,255,0.45)';
+  c2.lineWidth=0.7;
+  for(let y=step/2;y<H;y+=step) for(let x=step/2;x<W;x+=step){
+    let fx=0,fy=0;
+    for(const b of blobs){
+      const dx=b.cx-x,dy=b.cy-y;
+      const d2=dx*dx+dy*dy+1;
+      const f=3000/d2;
+      fx+=f*dx/Math.sqrt(d2);fy+=f*dy/Math.sqrt(d2);
+    }
+    const mag=Math.hypot(fx,fy);if(mag<0.3) continue;
+    const sc=Math.min(12,mag),nx=fx/mag,ny=fy/mag;
+    const ex=x+nx*sc,ey=y+ny*sc;
+    c2.beginPath();c2.moveTo(x,y);c2.lineTo(ex,ey);c2.stroke();
+    const angle=Math.atan2(ey-y,ex-x);
+    c2.beginPath();
+    c2.moveTo(ex,ey);
+    c2.lineTo(ex-5*Math.cos(angle-0.4),ey-5*Math.sin(angle-0.4));
+    c2.lineTo(ex-5*Math.cos(angle+0.4),ey-5*Math.sin(angle+0.4));
+    c2.closePath();c2.fill();
+  }
+}
+
+// ─── LISSAJOUS ───────────────────────────────
+function drawLissajous(c2,blobs,W,H){
+  for(const b of blobs){
+    const tid=findTid(b.cx,b.cy);if(tid===null) continue;
+    if(!lissaHistory[tid]) lissaHistory[tid]={xs:[],ys:[]};
+    const lh=lissaHistory[tid];
+    lh.xs.push(b.cx);lh.ys.push(b.cy);
+    if(lh.xs.length>TRAIL_LEN){lh.xs.shift();lh.ys.shift();}
+    if(lh.xs.length<4) continue;
+    const n=lh.xs.length;
+    const cx0=lh.xs.reduce((s,v)=>s+v,0)/n;
+    const cy0=lh.ys.reduce((s,v)=>s+v,0)/n;
+    const ax=Math.max(...lh.xs)-Math.min(...lh.xs)||1;
+    const ay=Math.max(...lh.ys)-Math.min(...lh.ys)||1;
+    c2.strokeStyle='rgba(0,255,136,0.65)';c2.lineWidth=0.8;c2.beginPath();
+    for(let i=0;i<n;i++){
+      const t=i/n*Math.PI*2;
+      const px=b.cx+(lh.xs[i]-cx0)/ax*40*Math.cos(t*1.5);
+      const py=b.cy+(lh.ys[i]-cy0)/ay*40*Math.sin(t*2);
+      i===0?c2.moveTo(px,py):c2.lineTo(px,py);
+    }
+    c2.stroke();
+  }
+}
+
+// ─── DELAUNAY ────────────────────────────────
+function delaunay(points){
+  if(points.length<3) return[];
+  const M=100000;
+  const superTri=[[-M,-M],[M*3,-M],[0,M*3]];
+  let tris=[[0,1,2]];
+  const pts=[...superTri,...points];
+  for(let pi=3;pi<pts.length;pi++){
+    const px=pts[pi][0],py=pts[pi][1];
+    const bad=[];
+    for(const t of tris){
+      const[ax,ay]=pts[t[0]],[bx,by]=pts[t[1]],[cx2,cy2]=pts[t[2]];
+      const D=2*(ax*(by-cy2)+bx*(cy2-ay)+cx2*(ay-by));
+      if(Math.abs(D)<1e-10) continue;
+      const ux=((ax*ax+ay*ay)*(by-cy2)+(bx*bx+by*by)*(cy2-ay)+(cx2*cx2+cy2*cy2)*(ay-by))/D;
+      const uy=((ax*ax+ay*ay)*(cx2-bx)+(bx*bx+by*by)*(ax-cx2)+(cx2*cx2+cy2*cy2)*(bx-ax))/D;
+      const r=Math.hypot(ax-ux,ay-uy);
+      if(Math.hypot(px-ux,py-uy)<r) bad.push(t);
+    }
+    const boundary=[];
+    for(const t of bad)
+      for(let i=0;i<3;i++){
+        const e=[t[i],t[(i+1)%3]];
+        const shared=bad.some(t2=>t2!==t&&t2.includes(e[0])&&t2.includes(e[1]));
+        if(!shared) boundary.push(e);
+      }
+    for(const t of bad){const i=tris.indexOf(t);if(i>-1)tris.splice(i,1);}
+    for(const e of boundary) tris.push([e[0],e[1],pi]);
+  }
+  return tris.filter(t=>!t.some(i=>i<3)).map(t=>t.map(i=>[pts[i][0],pts[i][1]]));
+}
+function drawDelaunay(c2,blobs){
+  if(blobs.length<3) return;
+  const tris=delaunay(blobs.map(b=>[b.cx,b.cy]));
+  c2.strokeStyle='rgba(255,170,0,0.5)';c2.fillStyle='rgba(255,170,0,0.05)';c2.lineWidth=0.7;
+  for(const t of tris){
+    c2.beginPath();c2.moveTo(t[0][0],t[0][1]);
+    c2.lineTo(t[1][0],t[1][1]);c2.lineTo(t[2][0],t[2][1]);
+    c2.closePath();c2.fill();c2.stroke();
+  }
+}
+
+// ─── FOURIER RINGS ───────────────────────────
+function updateFourierRings(blobs){
+  for(const b of blobs){
+    const tid=findTid(b.cx,b.cy);if(tid===null) continue;
+    const tr=blobTrails[tid];if(!tr||tr.length<4) continue;
+    const n=tr.length;
+    const v1x=tr[n-2].x-tr[n-3].x,v1y=tr[n-2].y-tr[n-3].y;
+    const v2x=tr[n-1].x-tr[n-2].x,v2y=tr[n-1].y-tr[n-2].y;
+    const dot=v1x*v2x+v1y*v2y;
+    const m1=Math.hypot(v1x,v1y),m2=Math.hypot(v2x,v2y);
+    if(m1<1||m2<1) continue;
+    const angle=Math.acos(Math.max(-1,Math.min(1,dot/(m1*m2))));
+    const speed=Math.hypot(v2x,v2y);
+    if(angle>0.2&&speed>2)
+      fourierRings.push({x:b.cx,y:b.cy,r:0,maxR:30+speed*4,age:0});
+  }
+  fourierRings=fourierRings.map(r=>({...r,r:r.r+2.5,age:r.age+1})).filter(r=>r.r<r.maxR);
+}
+function drawFourierRings(c2){
+  for(const r of fourierRings){
+    const alpha=1-(r.r/r.maxR);
+    c2.strokeStyle=`rgba(255,136,204,${alpha*0.65})`;c2.lineWidth=0.7;
+    c2.beginPath();c2.arc(r.x,r.y,r.r,0,Math.PI*2);c2.stroke();
+    if(r.r>10){
+      c2.strokeStyle=`rgba(255,136,204,${alpha*0.25})`;
+      c2.beginPath();c2.arc(r.x,r.y,r.r*0.5,0,Math.PI*2);c2.stroke();
+    }
+  }
+}
+
+// ─── REACTION DIFFUSION ──────────────────────
+function initRD(){
+  const w=Math.ceil((cvs.width||320)/RD_SCALE);
+  const h=Math.ceil((cvs.height||240)/RD_SCALE);
+  if(rdW===w&&rdH===h&&rdA) return;
+  rdW=w;rdH=h;
+  rdA=new Float32Array(w*h).fill(1);
+  rdB=new Float32Array(w*h).fill(0);
+}
+function seedRD(blobs){
+  if(!rdA) return;
+  for(const b of blobs){
+    const sx=Math.floor(b.cx/RD_SCALE),sy=Math.floor(b.cy/RD_SCALE);
+    for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){
+      const nx=sx+dx,ny=sy+dy;
+      if(nx<0||nx>=rdW||ny<0||ny>=rdH) continue;
+      rdB[ny*rdW+nx]=1;
+    }
+  }
+}
+function stepRD(steps=3){
+  if(!rdA) return;
+  const Da=0.16,Db=0.08,f=0.060,k=0.062;
+  const nA=new Float32Array(rdA),nB=new Float32Array(rdB);
+  const W=rdW,H=rdH;
+  for(let s=0;s<steps;s++){
+    for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+      const i=y*W+x;
+      const lapA=rdA[i-1]+rdA[i+1]+rdA[i-W]+rdA[i+W]-4*rdA[i];
+      const lapB=rdB[i-1]+rdB[i+1]+rdB[i-W]+rdB[i+W]-4*rdB[i];
+      const a=rdA[i],b=rdB[i],abb=a*b*b;
+      nA[i]=Math.max(0,Math.min(1,a+Da*lapA-abb+f*(1-a)));
+      nB[i]=Math.max(0,Math.min(1,b+Db*lapB+abb-(k+f)*b));
+    }
+    rdA.set(nA);rdB.set(nB);
+  }
+}
+function drawRD(c2,W,H){
+  if(!rdA||!rdB) return;
+  const id=new ImageData(rdW,rdH);
+  for(let i=0;i<rdW*rdH;i++){
+    const p=i*4;
+    id.data[p]  =Math.round(rdB[i]*136);
+    id.data[p+1]=Math.round(rdA[i]*80+rdB[i]*255);
+    id.data[p+2]=Math.round(rdA[i]*60+rdB[i]*204);
+    id.data[p+3]=Math.round(rdB[i]*180);
+  }
+  const tc=document.createElement('canvas');tc.width=rdW;tc.height=rdH;
+  tc.getContext('2d').putImageData(id,0,0);
+  c2.save();c2.globalAlpha=0.75;c2.imageSmoothingEnabled=true;
+  c2.drawImage(tc,0,0,W,H);c2.restore();
+}
+
 // ─── MAIN LOOP ───────────────────────────────
 function loop(){
   animId=requestAnimationFrame(loop);
   if(!vid.videoWidth||vid.readyState<2) return;
 
-  const W=vid.videoWidth, H=vid.videoHeight;
+  const W=vid.videoWidth,H=vid.videoHeight;
   if(cvs.width!==W||cvs.height!==H){
-    cvs.width=W; cvs.height=H;
-    offC.width=W; offC.height=H;
+    cvs.width=W;cvs.height=H;
+    offC.width=W;offC.height=H;
+    rawC.width=W;rawC.height=H;
     if(ovs.rdiff) initRD();
   }
 
   offX.drawImage(vid,0,0,W,H);
   const curr=offX.getImageData(0,0,W,H);
 
-  // FPS
+  // Raw canvas — just the video, no overlays
+  rawX.drawImage(vid,0,0,W,H);
+
   frameCount++;
   const now=performance.now();
   if(now-lastTime>=1000){
     document.getElementById('fps-label').textContent=frameCount+' fps';
-    frameCount=0; lastTime=now;
+    frameCount=0;lastTime=now;
   }
 
   const thr=Math.max(1,60-sliders.sensitivity);
@@ -837,93 +1022,67 @@ function loop(){
     blobs=findBlobs(mask,W,H,sliders.minsize,sliders.maxsize);
   }
   if(!prevFrame) prevFrame=curr;
-  else {
-    for(let i=0;i<curr.data.length;i++)
-      prevFrame.data[i]=prevFrame.data[i]*0.7+curr.data[i]*0.3;
-  }
+  else for(let i=0;i<curr.data.length;i++)
+    prevFrame.data[i]=prevFrame.data[i]*0.7+curr.data[i]*0.3;
 
-  const prevBlobs=Object.values(blobTrails).map(t=>t[t.length-1]).filter(Boolean);
-  blobTrails=matchBlobs(blobTrails, blobs.map(b=>[b.cx,b.cy]));
+  blobTrails=matchBlobs(blobTrails,blobs.map(b=>[b.cx,b.cy]));
 
-  // RD seed
-  if(ovs.rdiff){ if(!rdA) initRD(); seedRD(blobs,W,H); stepRD(3); }
+  if(ovs.rdiff){if(!rdA)initRD();seedRD(blobs);stepRD(3);}
+  if(ovs.fourier) updateFourierRings(blobs);
 
-  // Fourier ring update
-  if(ovs.fourier) updateFourierRings(blobs,prevBlobs);
-
-  // ── DRAW ──────────────────────────────────
+  // Draw
   ctx.clearRect(0,0,W,H);
   ctx.drawImage(vid,0,0,W,H);
 
-  // Reaction diffusion (behind everything)
-  if(ovs.rdiff) drawRD(ctx,W,H);
-
-  // Voronoi
+  if(ovs.rdiff)  drawRD(ctx,W,H);
   if(ovs.voro&&blobs.length>=2) drawVoronoi(ctx,blobs,W,H);
-
-  // Force field
-  if(ovs.force&&blobs.length) drawForceField(ctx,blobs,W,H);
-
-  // Delaunay
+  if(ovs.force&&blobs.length)   drawForceField(ctx,blobs,W,H);
   if(ovs.dela&&blobs.length>=3) drawDelaunay(ctx,blobs);
-
-  // Convex hull
   if(ovs.hull&&blobs.length>=2) drawHull(ctx,blobs);
-
-  // Fourier rings
   if(ovs.fourier) drawFourierRings(ctx);
+  if(ovs.lissa&&blobs.length)   drawLissajous(ctx,blobs,W,H);
 
-  // Lissajous
-  if(ovs.lissa&&blobs.length) drawLissajous(ctx,blobs,W,H);
-
-  // Overlap detection
+  // Overlap
   const ovSet=new Set();
   for(let i=0;i<blobs.length;i++)
     for(let j=i+1;j<blobs.length;j++){
       const a=blobs[i],b=blobs[j];
       if(a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y){
-        ovSet.add(i); ovSet.add(j);
+        ovSet.add(i);ovSet.add(j);
       }
     }
 
-  // Blob boxes + labels
+  // Blob boxes
   for(let i=0;i<blobs.length;i++){
     const b=blobs[i];
     const isOv=ovSet.has(i);
     const col=isOv?OVERLAP_COL:contrastColor(curr.data,b.x,b.y,b.w,b.h,W,H);
-
-    ctx.strokeStyle=col; ctx.lineWidth=1;
+    ctx.strokeStyle=col;ctx.lineWidth=1;
     ctx.strokeRect(b.x,b.y,b.w,b.h);
-
-    // Corner ticks
-    ctx.lineWidth=2;
-    const t=10;
-    for(const [cx2,cy2,dx,dy] of [
+    ctx.lineWidth=2;const t=10;
+    for(const[cx2,cy2,dx,dy] of[
       [b.x,b.y,1,1],[b.x+b.w,b.y,-1,1],
       [b.x,b.y+b.h,1,-1],[b.x+b.w,b.y+b.h,-1,-1]
     ]){
       ctx.beginPath();
-      ctx.moveTo(cx2,cy2); ctx.lineTo(cx2+dx*t,cy2);
-      ctx.moveTo(cx2,cy2); ctx.lineTo(cx2,cy2+dy*t);
+      ctx.moveTo(cx2,cy2);ctx.lineTo(cx2+dx*t,cy2);
+      ctx.moveTo(cx2,cy2);ctx.lineTo(cx2,cy2+dy*t);
       ctx.stroke();
     }
-
     if(isOv){
       ctx.fillStyle=OVERLAP_COL;
       ctx.font='11px -apple-system,sans-serif';
       ctx.fillText('OVERLAP',b.x,b.y-6);
     }
-
     const lbl=`#${i+1}  ${b.cx},${b.cy}`;
-    let lx=b.x+b.w+8; const ly=b.y+14;
+    let lx=b.x+b.w+8;const ly=b.y+14;
     ctx.font='11px -apple-system,sans-serif';
     const tw=ctx.measureText(lbl).width;
     if(lx+tw>W) lx=b.x-tw-8;
-    ctx.fillStyle=col;
-    ctx.fillText(lbl,lx,ly);
+    ctx.fillStyle=col;ctx.fillText(lbl,lx,ly);
   }
 
-  document.getElementById('blob-badge').textContent=
+  document.getElementById('blob-count').textContent=
     blobs.length+(blobs.length===1?' blob':' blobs');
 }
 
